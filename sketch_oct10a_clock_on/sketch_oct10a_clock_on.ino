@@ -1,16 +1,18 @@
 // часы
 #include <DS1302.h>
-DS1302 rtc(10, 7, 5);
-
 // дисплей
 #include "TM1637.h"
 
+// часы
+DS1302 rtc(10, 7, 5);
+
+
+// дисплей
 const int CLK = 11; //Set the CLK pin connection to the display
 const int DIO = 12; //Set the DIO pin connection to the display
 int8_t TimeDisp[] = {0x00,0x00,0x00,0x00};
 
 TM1637 tm1637(CLK, DIO);  //set up the 4-Digit Display.
-
 
 void setup()
 {
