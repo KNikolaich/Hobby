@@ -3,7 +3,6 @@
 #define pinWater 7  // Watermotor pin D7
 #define led2 3 // LED2 pin D3
 
-
 #define ledG 9 // LED green pin D9
 #define ledR 6 // LED red pin D6
 #define ledY 8 // LED yellow pin D8
