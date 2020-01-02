@@ -1,13 +1,13 @@
 #include <OneWire.h>
 #include "pitches.h"
 
-#define iButtonPin A5      // Линия data ibutton
-#define R_Led 2            // RGB Led
+#define iButtonPin 11      // Линия data ibutton
+#define R_Led 13            // RGB Led
 #define G_Led 3
 #define B_Led 4
 #define ACpinGnd 5         // Земля аналогового компаратора Cyfral/Metacom
-#define ACpin 6            // Вход аналогового компаратора 3В для Cyfral/Metacom
-#define BtnPin 7           // Кнопка переключения режима чтение/запись
+#define ACpin 7           // Вход аналогового компаратора 3В для Cyfral/Metacom
+#define BtnPin 6           // Кнопка переключения режима чтение/запись
 #define BtnPinGnd 8        // Земля кнопки переключения режима 
 #define speakerPin 9       // Спикер, он же buzzer, он же beeper
 #define speakerPinGnd 10    // земля Спикера
