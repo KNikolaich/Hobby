@@ -1,91 +1,150 @@
+//﻿Программное обеспечение. Для компиляции необходима библиотека OneWire. Скачать можно тут http://go.mysku.ru/?r=http%3A%2F%2Fwww.pjrc.com%2Fteensy%2Farduino_libraries%2FOneWire.zip&key=ms
+//Для редактирования кода мастер ключа меняем строчку 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x2F в скетче на свою.
 #include <OneWire.h>
 
-#define pin 10
+#define pin 11
+OneWire ibutton (pin); // Пин D11 для подлючения iButton (Data)
+byte addr[8];
+/// 01:FD:14:3D:D:0:0:A3 - Наташин ключ
+/// 1:E6:E0:D6:C:0:0:CF - б.Оли ключ
+byte ReadID[8] = { 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x2F }; // "Универсальный" ключ. Прошивается последовательность 01:FF:FF:FF:FF:FF:FF:2F
 
+const int buttonPin = 6;
+const int ledPin = 13;
+int writeflag = 0;
 
-  byte key_to_write[] = { 0x01, 0x19, 0x90, 0x00, 0x00, 0x00, 0x00, 0xFF }; //  
-
-
-OneWire  ds(pin);  // pin 10 is 1-Wire interface pin now
-
-void setup(void) {
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT);
   Serial.begin(9600);
 }
 
-void loop(void) {
-  byte i;
-  byte data[8];
+void loop() {
 
-  delay(2000); // 1 sec
-  
-  ds.reset();
-  delay(50);
-  ds.write(0x33); // "READ" command
-  
-  ds.read_bytes(data, 8);
-
-  Serial.print("KEY ");
-  for( i = 0; i < 8; i++) {
-    Serial.print(data[i], HEX);
-    if (i != 7) Serial.print(":");
+  if (digitalRead(buttonPin) == HIGH) {
+    writeflag = 1;
+    digitalWrite(ledPin, HIGH);
   }
-
-  // Check if FF:FF:FF:FF:FF:FF:FF:FF
-  // If your button is really programmed with FF:FF:FF:FF:FF:FF:FF:FF, then remove this check
-  if (data[0] & data[1] & data[2] & data[3] & data[4] & data[5] & data[6] & data[7] == 0xFF)
-  {
-    Serial.println("...nothing found!"); 
-    return;
-  }
-
- // return; // remove when ready to programm ВОТ УБРАТЬ КОММЕНТ для считывания, поставить для записи
-
-  // Check if read key is equal to the one to be programmed
-  for (i = 0; i < 8; i++)
-    if (data[i] != key_to_write[i])
-      break;
-    else
-      if (i == 7)
-      {
-        Serial.println("...already programmed!");
-        return;
-      }
-
-  Serial.println();
-  Serial.print("Programming new key...");
-  
-  for (uint8_t i = 0; i < 8; i++)
-  {
-    ds.reset();
-    data[0] = 0x3C; // "WRITE" command
-    data[1] = i; // programming i-th byte
-    data[2] = 0;
-    data[3] = key_to_write[i];
-    ds.write_bytes(data, 4);
-    Serial.print(".");
-  
-    uint8_t crc = ds.read();
-    
-    if (OneWire::crc8(data, 4) != crc) {
-        Serial.print("error!\r\n");
-        return;
+  if (!ibutton.search (addr)) {
+      ibutton.reset_search();
+      delay(50);
+      return;
     }
-    else
-      Serial.print(".");
+    digitalWrite(ledPin, HIGH);
+    delay(50);
+
+    for (byte x = 0; x < 8; x++) {
+      Serial.print(addr[x], HEX);
+      //if (readflag == 0) {
+      // ReadID[x] = (addr[x]);
+      //}
+      Serial.print(":");
+    }
+
     
-    send_programming_impulse();
-  }
+    byte crc; // Проверка контрольной суммы
+    crc = ibutton.crc8(addr, 7);
+    Serial.print("CRC: ");
+    Serial.println(crc, HEX);
+    digitalWrite(ledPin, LOW);
+
   
-  Serial.println("done!");
+
+  if (writeflag == 1) {
+    writeIntoKey();
+    //send logical 1
+    digitalWrite(pin, LOW); pinMode(pin, OUTPUT); delayMicroseconds(10);
+    pinMode(pin, INPUT); digitalWrite(pin, HIGH); delay(10);
+    writeflag = 0;
+    //readflag = 0;
+    digitalWrite(ledPin, LOW);
+  }
 }
 
-void send_programming_impulse()
-{
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH); 
+void writeIntoKey() {
+  Serial.print("Start programming..."); // начало процесса записи данных в ключ
+
+  for (int i = 0; i < 8; i++) {
+    ibutton.reset(); // сброс ключа и формирование 4-х байт для записи в ключ
+
+    byte data[4]; // массив для хранения данных ключа
+    data[0] = 0x3C; // отправляем команду "запись"
+    data[1] = i; // указываем байт для записи
+    data[2] = 0;
+    data[3] = ReadID[i];
+    ibutton.write_bytes(data, 4); // записываем i-ый байт в ключ
+
+    Serial.println("write_bytes: "); // сообщение о записи байт
+
+    Serial.print(ReadID[i]); // сообщение о записи байт
+    Serial.print(' ');
+
+    uint8_t b = ibutton.read(); // считываем байт из ключа
+
+    if (OneWire::crc8(data, 4) != b) { // при ошибке контрольной суммы
+      Serial.println("Error while programming!"); // сообщаем об этом
+      return; // и отменяем запись ключа
+    }
+    send_programming_impulse(); // если всё хорошо, посылаем импульс для записи i-го байта в ключ
+  }
+  Serial.println("Success!"); // сообщение об успешной записи данных в ключ
+}
+
+// Инициализация записи данных в ключ-таблетку iButton:
+void send_programming_impulse() {
+  digitalWrite(pin, HIGH);
   delay(60);
-  digitalWrite(pin, LOW); 
+  digitalWrite(pin, LOW);
   delay(5);
-  digitalWrite(pin, HIGH); 
-  delay(50); 
+  digitalWrite(pin, HIGH);
+  delay(50);
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+void writeIntoKeyOld() {
+  ibutton.skip(); ibutton.reset(); ibutton.write(0x33);
+  Serial.print("  ID before write:");
+  for (byte x = 0; x < 8; x++) {
+    Serial.print(' ');
+    Serial.print(ibutton.read(), HEX);
+  }
+  // send reset
+  ibutton.skip();
+  ibutton.reset();
+  // send 0xD1
+  ibutton.write(0xD1);
+  // send logical 0
+  digitalWrite(pin, LOW); pinMode(pin, OUTPUT); delayMicroseconds(60);
+  pinMode(pin, INPUT); digitalWrite(pin, HIGH); delay(10);
+
+  Serial.print('\n');
+  Serial.print("  Writing iButton ID:\n    ");
+  byte newID[8] = { (ReadID[0]), (ReadID[1]), (ReadID[2]), (ReadID[3]), (ReadID[4]), (ReadID[5]), (ReadID[6]), (ReadID[7]) };
+  ibutton.skip();
+  ibutton.reset();
+  ibutton.write(0xD5);
+  for (byte x = 0; x < 8; x++) {
+    writeByte(newID[x]);
+    Serial.print('*');
+  }
+  Serial.print('\n');
+  ibutton.reset();
+  // send 0xD1
+  ibutton.write(0xD1);
+}
+int writeByte(byte data) {
+  int data_bit;
+  for (data_bit = 0; data_bit < 8; data_bit++) {
+    if (data & 1) {
+      digitalWrite(pin, LOW); pinMode(pin, OUTPUT);
+      delayMicroseconds(60);
+      pinMode(pin, INPUT); digitalWrite(pin, HIGH);
+      delay(10);
+    } else {
+      digitalWrite(pin, LOW); pinMode(pin, OUTPUT);
+      pinMode(pin, INPUT); digitalWrite(pin, HIGH);
+      delay(10);
+    }
+    data = data >> 1;
+  }
+  return 0;
 }
